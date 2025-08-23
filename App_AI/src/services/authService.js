@@ -1,24 +1,55 @@
 // src/services/authService.js
-const API_URL = 'http://localhost:3001/api';
+
+// Mock user data for development
+const MOCK_USERS = [
+  {
+    id: 1,
+    email: 'admin@example.com',
+    password: 'admin123',
+    name: 'Admin User',
+    role: 'admin'
+  },
+  {
+    id: 2,
+    email: 'user@example.com',
+    password: 'user123',
+    name: 'Regular User',
+    role: 'user'
+  }
+];
+
+// Simulate API delay
+const simulateDelay = (ms = 500) => new Promise(resolve => setTimeout(resolve, ms));
 
 export const authService = {
   async login(email, password) {
     try {
-      const response = await fetch(`${API_URL}/auth/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password }),
-      });
+      // Simulate network delay
+      await simulateDelay();
       
-      if (!response.ok) {
-        throw new Error('Login failed');
+      // Find user by email and password
+      const user = MOCK_USERS.find(u => u.email === email && u.password === password);
+      
+      if (!user) {
+        throw new Error('Invalid email or password');
       }
 
-      const data = await response.json();
-      localStorage.setItem('token', data.token);
-      return data;
+      // Create mock token
+      const token = btoa(JSON.stringify({ 
+        userId: user.id, 
+        email: user.email, 
+        exp: Date.now() + 24 * 60 * 60 * 1000 // 24 hours
+      }));
+
+      // Store token
+      localStorage.setItem('token', token);
+      
+      // Return user data (excluding password)
+      const { password: _, ...userWithoutPassword } = user;
+      return {
+        user: userWithoutPassword,
+        token
+      };
     } catch (error) {
       console.error('Login error:', error);
       throw error;
@@ -27,21 +58,36 @@ export const authService = {
 
   async register(userData) {
     try {
-      const response = await fetch(`${API_URL}/auth/register`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(userData),
-      });
-
-      if (!response.ok) {
-        throw new Error('Registration failed');
+      // Simulate network delay
+      await simulateDelay();
+      
+      // Check if user already exists
+      const existingUser = MOCK_USERS.find(u => u.email === userData.email);
+      if (existingUser) {
+        throw new Error('User with this email already exists');
       }
 
-      const data = await response.json();
-      localStorage.setItem('token', data.token);
-      return data;
+      // Create new user
+      const newUser = {
+        id: Date.now(),
+        email: userData.email,
+        name: userData.name || 'New User',
+        role: 'user'
+      };
+
+      // Create mock token
+      const token = btoa(JSON.stringify({ 
+        userId: newUser.id, 
+        email: newUser.email, 
+        exp: Date.now() + 24 * 60 * 60 * 1000 // 24 hours
+      }));
+
+      localStorage.setItem('token', token);
+      
+      return {
+        user: newUser,
+        token
+      };
     } catch (error) {
       console.error('Registration error:', error);
       throw error;
@@ -57,6 +103,33 @@ export const authService = {
   },
 
   isAuthenticated() {
-    return !!this.getToken();
+    const token = this.getToken();
+    if (!token) return false;
+    
+    try {
+      const payload = JSON.parse(atob(token));
+      return payload.exp > Date.now();
+    } catch {
+      return false;
+    }
   },
+
+  getCurrentUser() {
+    const token = this.getToken();
+    if (!token) return null;
+    
+    try {
+      const payload = JSON.parse(atob(token));
+      if (payload.exp <= Date.now()) return null;
+      
+      const user = MOCK_USERS.find(u => u.id === payload.userId);
+      if (user) {
+        const { password: _, ...userWithoutPassword } = user;
+        return userWithoutPassword;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }
 };
