@@ -1,6 +1,6 @@
 // src/context/ChatContext.jsx
 import React, { createContext, useState, useCallback } from 'react';
-import { aiService } from '../services/aiService';
+import { sendMessage as sendAiMessage, getConversationHistory, createConversation } from '../services/aiService';
 import { analyticsService } from '../services/analyticsService';
 
 export const ChatContext = createContext(null);
@@ -10,6 +10,10 @@ export function ChatProvider({ children }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [conversationId, setConversationId] = useState(null);
+
+  // Valores Hardcoded para la prueba solicitada:
+  const AGENT_ID_TEST = "b0000000-0000-0000-0000-000000000001";
+  const ORG_ID_TEST = "a0000000-0000-0000-0000-000000000001";
 
   const sendMessage = useCallback(async (content) => {
     try {
@@ -25,13 +29,29 @@ export function ChatProvider({ children }) {
       };
       setMessages((prev) => [...prev, userMessage]);
 
-      // Process message with AI
-      const response = await aiService.processMessage(content, conversationId);
+      // Aseguramos de tener un conversationId o crear una nueva conversacion
+      let activeConversationId = conversationId;
+      if (!activeConversationId) {
+        // En una app real, orgId vendria del usuario logueado en la sesion
+        activeConversationId = await createConversation({
+          orgId: ORG_ID_TEST,
+          agentId: AGENT_ID_TEST,
+          customerName: "Invitado Demo",
+        });
+        setConversationId(activeConversationId);
+      }
+
+      // Process message with AI Edge Function
+      const response = await sendAiMessage({
+        conversationId: activeConversationId,
+        message: content,
+        agentId: AGENT_ID_TEST
+      });
 
       // Add AI response to the chat
       const aiMessage = {
         id: Date.now() + 1,
-        content: response.message,
+        content: response.reply,
         sender: 'ai',
         timestamp: new Date().toISOString(),
       };
@@ -41,17 +61,14 @@ export function ChatProvider({ children }) {
       await analyticsService.trackEvent({
         type: 'message_processed',
         data: {
-          conversationId,
+          conversationId: activeConversationId,
           userMessage: content,
-          aiResponse: response.message,
+          aiResponse: response.reply,
         },
       });
 
-      if (!conversationId) {
-        setConversationId(response.conversationId);
-      }
     } catch (err) {
-      setError('Failed to process message. Please try again.');
+      setError(err.message || 'Failed to process message. Please try again.');
       console.error('Message processing error:', err);
     } finally {
       setLoading(false);

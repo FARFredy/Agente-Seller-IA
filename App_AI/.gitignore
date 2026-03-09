@@ -1,0 +1,23 @@
+# Dependencias
+node_modules/
+
+# Variables de entorno secretas - NUNCA subir
+.env
+.env.local
+.env.production
+.env*.local
+
+# Build generado
+dist/
+
+# Editor
+.vscode/
+
+# Sistema
+.DS_Store
+Thumbs.db
+
+# Supabase local
+supabase/.branches
+supabase/.temp
+
