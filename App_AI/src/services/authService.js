@@ -1,62 +1,38 @@
 // src/services/authService.js
-const API_URL = 'http://localhost:3001/api';
+import { supabase } from '../utils/supabase';
 
 export const authService = {
+
   async login(email, password) {
-    try {
-      const response = await fetch(`${API_URL}/auth/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password }),
-      });
-      
-      if (!response.ok) {
-        throw new Error('Login failed');
-      }
-
-      const data = await response.json();
-      localStorage.setItem('token', data.token);
-      return data;
-    } catch (error) {
-      console.error('Login error:', error);
-      throw error;
-    }
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+    if (error) throw new Error(error.message);
+    return { user: data.user, session: data.session };
   },
 
-  async register(userData) {
-    try {
-      const response = await fetch(`${API_URL}/auth/register`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(userData),
-      });
-
-      if (!response.ok) {
-        throw new Error('Registration failed');
-      }
-
-      const data = await response.json();
-      localStorage.setItem('token', data.token);
-      return data;
-    } catch (error) {
-      console.error('Registration error:', error);
-      throw error;
-    }
+  async register(email, password) {
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+    });
+    if (error) throw new Error(error.message);
+    return { user: data.user };
   },
 
-  logout() {
-    localStorage.removeItem('token');
+  async logout() {
+    const { error } = await supabase.auth.signOut();
+    if (error) throw new Error(error.message);
   },
 
-  getToken() {
-    return localStorage.getItem('token');
+  async getSession() {
+    const { data } = await supabase.auth.getSession();
+    return data.session;
   },
 
   isAuthenticated() {
-    return !!this.getToken();
+    return supabase.auth.getSession()
+      .then(({ data }) => !!data.session);
   },
 };
